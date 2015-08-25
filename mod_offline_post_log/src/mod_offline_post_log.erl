@@ -14,7 +14,7 @@
 % - track requests
 % - test sending files etc.
 
-start(Host, Opts) ->
+start(Host, _Opts) ->
   %application:start(ssl), % todo: for https
   case inets:start() of 
     {error, {already_started, _}} -> ok;
@@ -53,7 +53,7 @@ process_message_filter(From, To, {<<"type">>, Type}, Packet)
 process_message_filter(_From, _To, _Type, _Packet) ->
   ok.
 
-log_message(From, To, #xmlel{children = Els} = Packet) ->
+log_message(From, To, #xmlel{children = Els} = _Packet) ->
   case get_body(Els) of
     no_body ->
       ok;
@@ -108,10 +108,10 @@ basic_auth_header(Username, Password) ->
   {"Authorization", "Basic " ++ base64:encode_to_string(Username ++ ":" ++ Password)}.
 
 % once we track results...
-post_result({_ReqId, {error, Reason}}) ->
+post_result({_ReqId, {error, _Reason}}) ->
   ok;
 
-post_result({_ReqId, Result}) ->
+post_result({_ReqId, _Result}) ->
   ok.
 
 get_opt(Opt) ->
