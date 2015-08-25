@@ -1,0 +1,123 @@
+-module(mod_offline_post_log).
+
+-behaviour(gen_mod).
+
+-include("ejabberd.hrl").
+-include("jlib.hrl").
+-include("logger.hrl").
+
+-export([start/2, stop/1, log_user_send/3]).
+
+% TODO:
+% - enable the https
+% - cleanup
+% - track requests
+% - timestamp
+
+start(Host, Opts) ->
+  %application:start(ssl), % todo: for https
+  case inets:start() of 
+    {error, {already_started, _}} -> ok;
+    ok -> ok
+  end,
+  ejabberd_hooks:add(offline_message_hook, Host, ?MODULE, log_user_send, 1),
+  ok.
+
+stop(Host) ->
+  ejabberd_hooks:delete(offline_message_hook, Host, ?MODULE, log_user_send, 1),
+  ok.
+
+log_user_send(From, To, Packet) ->
+  process_packet(From, To, Packet),
+  ok.
+
+process_packet(From, To, #xmlel{name = <<"message">>} = Packet) ->
+  ok = process_message(From, To, Packet);
+
+process_packet(_From, _To, _Packet) ->
+  ok.
+
+process_message(From, To, #xmlel{attrs = Attrs} = Packet) ->
+  Type = lists:keyfind(<<"type">>, 1, Attrs),
+  process_message_filter(From, To, Type, Packet),
+  ok;
+
+process_message(_From, _To, _Packet) ->
+  ok.
+
+process_message_filter(From, To, {<<"type">>, Type}, Packet)
+  when Type =:= <<"chat">> ->
+  log_message(From, To, Packet),
+  ok;
+
+process_message_filter(_From, _To, _Type, _Packet) ->
+  ok.
+
+log_message(From, To, #xmlel{children = Els} = Packet) ->
+  case get_body(Els) of
+    no_body ->
+      ok;
+    {ok, Body} ->
+      post_message(From, To, Body),
+      ok
+  end;
+
+log_message(_From, _To, _Packet) ->
+  ok.
+
+get_body(Els) ->
+  XmlEls = [ El || El <- Els, is_record(El, xmlel) ],
+  case lists:keyfind(<<"body">>, #xmlel.name, XmlEls) of
+    false ->
+      no_body;
+    #xmlel{children = InnerEls} ->
+      case lists:keyfind(xmlcdata, 1, InnerEls) of
+        false ->
+          no_body;
+        {xmlcdata, Body} ->
+          {ok, Body}
+      end
+  end.
+
+post_message(From, To, Body) ->
+    JsonBody = list_to_binary(to_json(From, To, Body)),
+    Url = get_opt(url),
+    ?INFO_MSG(Url, []),
+    ?INFO_MSG(JsonBody, []),
+    BasicAuthUsername = get_opt(username),
+    BasicAuthPassword = get_opt(password),
+    BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
+    httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody}, 
+                  [], []),
+    ok.
+
+% I didnt want to introduce dependency on json serializer just for this case
+jid_to_json(#jid{luser = Username, lserver = Server, lresource = Resource}) ->
+  io_lib:format("{\"username\":\"~s\",\"server\":\"~s\",\"resource\":\"~s\"}",
+                [Username, Server, Resource]);
+jid_to_json(_) ->
+  "unknown".
+
+to_json(From, To, Body) ->
+  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\"}",
+                [jid_to_json(From), jid_to_json(To), Body]).
+
+
+basic_auth_header(Username, Password) ->
+  {"Authorization", "Basic " ++ base64:encode_to_string(Username ++ ":" ++ Password)}.
+
+% once we track results...
+post_result({_ReqId, {error, Reason}}) ->
+  ok;
+
+post_result({_ReqId, Result}) ->
+  ok.
+
+get_opt(Opt) ->
+      get_opt(Opt, undefined).
+
+get_opt(Opt, Default) ->
+      F = fun(Val) when is_binary(Val) -> binary_to_list(Val);
+             (Val)                     -> Val
+           end,
+      gen_mod:get_module_opt(global, ?MODULE, Opt, F, Default).
