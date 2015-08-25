@@ -12,7 +12,7 @@
 % - enable the https
 % - cleanup
 % - track requests
-% - timestamp
+% - test sending files etc.
 
 start(Host, Opts) ->
   %application:start(ssl), % todo: for https
@@ -80,7 +80,8 @@ get_body(Els) ->
   end.
 
 post_message(From, To, Body) ->
-    JsonBody = list_to_binary(to_json(From, To, Body)),
+    Timestamp = to_iso_8601_date(os:timestamp()),
+    JsonBody = list_to_binary(to_json(From, To, Body, Timestamp)),
     Url = get_opt(url),
     ?INFO_MSG(Url, []),
     ?INFO_MSG(JsonBody, []),
@@ -98,9 +99,9 @@ jid_to_json(#jid{luser = Username, lserver = Server, lresource = Resource}) ->
 jid_to_json(_) ->
   "unknown".
 
-to_json(From, To, Body) ->
-  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\"}",
-                [jid_to_json(From), jid_to_json(To), Body]).
+to_json(From, To, Body, Timestamp) ->
+  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\",\"timestamp\":\"~s\"}",
+                [jid_to_json(From), jid_to_json(To), Body, Timestamp]).
 
 
 basic_auth_header(Username, Password) ->
@@ -121,3 +122,18 @@ get_opt(Opt, Default) ->
              (Val)                     -> Val
            end,
       gen_mod:get_module_opt(global, ?MODULE, Opt, F, Default).
+
+%% Erlang now()-style timestamps are in UTC by definition, and we are
+%% assuming ISO 8601 dates should be printed in UTC as well, so no
+%% conversion necessary
+%%
+%% Example:
+%%   {1385,388790,334905}
+%%     -becomes-
+%%   2013-11-25 14:13:10.334905Z
+-spec to_iso_8601_date(erlang:timestamp()) -> string().
+to_iso_8601_date(Timestamp) when is_tuple(Timestamp) ->
+     {{Y, Mo, D}, {H, M, S}} = calendar:now_to_universal_time(Timestamp),
+         {_, _, US} = Timestamp,
+         lists:flatten(io_lib:format("~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
+                                      [Y, Mo, D, H, M, S, US])).
