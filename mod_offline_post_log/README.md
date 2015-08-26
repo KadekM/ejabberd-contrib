@@ -29,7 +29,8 @@ modules:
          "server":"localhost",
          "resource":"789123456789"
         },
-   "message":"someone somewhere somewhat"
+   "message":"someone somewhere somewhat",
+   "timestamp":"2015-08-25T23:25:12.123456Z"
  }
  ```
 

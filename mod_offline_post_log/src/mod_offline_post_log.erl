@@ -130,10 +130,10 @@ get_opt(Opt, Default) ->
 %% Example:
 %%   {1385,388790,334905}
 %%     -becomes-
-%%   2013-11-25 14:13:10.334905Z
+%%   2013-11-25T14:13:10.334905Z
 -spec to_iso_8601_date(erlang:timestamp()) -> string().
 to_iso_8601_date(Timestamp) when is_tuple(Timestamp) ->
      {{Y, Mo, D}, {H, M, S}} = calendar:now_to_universal_time(Timestamp),
          {_, _, US} = Timestamp,
-         lists:flatten(io_lib:format("~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
+         lists:flatten(io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
                                       [Y, Mo, D, H, M, S, US])).
