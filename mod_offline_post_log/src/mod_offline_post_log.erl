@@ -38,15 +38,17 @@ process_packet(_From, _To, _Packet) ->
   ok.
 
 process_message(From, To, #xmlel{attrs = Attrs} = Packet) ->
-  Type = lists:keyfind(<<"type">>, 1, Attrs),
-  process_message_filter(From, To, Type, Packet),
+  case lists:keyfind(<<"type">>, 1, Attrs) of
+    {_, _} = Type -> process_message_filter(From, To, Type, Packet);
+             false -> process_message_filter(From, To, {<<"type">>, <<"">>}, Packet)
+  end,
   ok;
 
 process_message(_From, _To, _Packet) ->
   ok.
 
 process_message_filter(From, To, {<<"type">>, Type}, Packet)
-  when Type =:= <<"chat">> ->
+  when Type =:= <<"chat">> orelse Type =:= <<"">> ->
   log_message(From, To, Packet),
   ok;
 
@@ -58,7 +60,8 @@ log_message(From, To, #xmlel{children = Els} = _Packet) ->
     no_body ->
       ok;
     {ok, Body} ->
-      post_message(From, To, Body),
+      XUrls = get_x_urls(Els),
+      post_message(From, To, Body, XUrls),
       ok
   end;
 
@@ -79,9 +82,15 @@ get_body(Els) ->
       end
   end.
 
-post_message(From, To, Body) ->
+get_x_urls(Els) ->
+  OnlyXTags = [El || El <- Els, is_record(El, xmlel) andalso element(#xmlel.name, El) =:= <<"x">>,
+                     lists:keyfind(<<"xmlns">>, 1, element(#xmlel.attrs, El)) =:= {<<"xmlns">>, <<"jabber:x:oob">>}],
+  FlattenChildren = [Children || El <- OnlyXTags, Children <- element(#xmlel.children, El), is_record(Children, xmlel), element(#xmlel.name, Children) =:= <<"url">> ],
+  [binary_to_list(element(2, UrlNode)) || U <- FlattenChildren, UrlNode <- element(#xmlel.children, U)].
+
+post_message(From, To, Body, XUrls) ->
     Timestamp = to_iso_8601_date(os:timestamp()),
-    JsonBody = list_to_binary(to_json(From, To, Body, Timestamp)),
+    JsonBody = list_to_binary(to_json(From, To, Body, Timestamp, XUrls)),
     Url = get_opt(url),
     ?INFO_MSG(Url, []),
     ?INFO_MSG(JsonBody, []),
@@ -99,10 +108,14 @@ jid_to_json(#jid{luser = Username, lserver = Server, lresource = Resource}) ->
 jid_to_json(_) ->
   "unknown".
 
-to_json(From, To, Body, Timestamp) ->
-  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\",\"timestamp\":\"~s\"}",
-                [jid_to_json(From), jid_to_json(To), Body, Timestamp]).
+to_json(From, To, Body, Timestamp, XUrls) ->
+  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\",\"timestamp\":\"~s\",\"x-url\":~s}",
+                [jid_to_json(From), jid_to_json(To), Body, Timestamp, xurl_to_json(XUrls)]).
 
+
+xurl_to_json(XUrls) ->
+  io_lib:format("~p", [XUrls]).
+  
 
 basic_auth_header(Username, Password) ->
   {"Authorization", "Basic " ++ base64:encode_to_string(Username ++ ":" ++ Password)}.
