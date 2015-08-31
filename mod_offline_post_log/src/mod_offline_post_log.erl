@@ -8,11 +8,11 @@
 
 -export([start/2, stop/1, log_user_send/3]).
 
-% TODO:
-% - enable the https
-% - cleanup
-% - track requests
-% - test sending files etc.
+%% TODO:
+%% - enable the https
+%% - cleanup
+%% - track requests
+%% - document, comment
 
 start(Host, _Opts) ->
   %application:start(ssl), % todo: for https
