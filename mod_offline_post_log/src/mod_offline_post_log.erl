@@ -109,7 +109,7 @@ jid_to_json(_) ->
   "unknown".
 
 to_json(From, To, Body, Timestamp, XUrls) ->
-  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\",\"timestamp\":\"~s\",\"xurl\":~s}",
+  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\",\"timestamp\":\"~s\",\"xurls\":~s}",
                 [jid_to_json(From), jid_to_json(To), Body, Timestamp, xurl_to_json(XUrls)]).
 
 

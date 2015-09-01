@@ -31,7 +31,7 @@ modules:
         },
    "message":"someone somewhere somewhat",
    "timestamp":"2015-08-25T23:25:12.123456Z",
-   "xurl": [ "url1" ]
+   "xurls": [ "url1" ]
  }
  ```
 
