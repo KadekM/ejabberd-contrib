@@ -97,8 +97,8 @@ post_message(From, To, Body, XUrls) ->
     BasicAuthUsername = get_opt(username),
     BasicAuthPassword = get_opt(password),
     BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
-    httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody}, 
-                  [], []),
+    httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
+            [{ssl,[{verify,0}]}], []),
     ok.
 
 % I didnt want to introduce dependency on json serializer just for this case
