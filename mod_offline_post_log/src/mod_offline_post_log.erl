@@ -97,8 +97,11 @@ post_message(From, To, Body, XUrls) ->
     BasicAuthUsername = get_opt(username),
     BasicAuthPassword = get_opt(password),
     BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
-    httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
-            [{ssl,[{verify,0}]}], []),
+    case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
+            [{ssl,[{verify,0}]}], []) of
+      {error, Reason} -> ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~s. Reason: ~s.", [error, Reason]);
+      {ok, Result} -> ?DEBUG("Message sent. Ok: ~s. Result: ~s.", [ok, Result])
+    end,
     ok.
 
 % I didnt want to introduce dependency on json serializer just for this case
