@@ -100,7 +100,7 @@ post_message(From, To, Body, XUrls) ->
     case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
             [{ssl,[{verify,0}]}], []) of
       {error, Reason} -> ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~s. Reason: ~s.", [error, Reason]);
-      {ok, Result} -> ?DEBUG("Message sent. Ok: ~s. Result: ~s.", [ok, Result])
+      {ok, Result} -> ?DEBUG("Message sent. Result: ~s.", [ok, Result])
     end,
     ok.
 
