@@ -78,7 +78,7 @@ get_body(Els) ->
         false ->
           no_body;
         {xmlcdata, Body} ->
-          {ok, Body}
+          {ok, unicode:characters_to_list(Body, utf8)}
       end
   end.
 
@@ -90,7 +90,7 @@ get_x_urls(Els) ->
 
 post_message(From, To, Body, XUrls) ->
     Timestamp = to_iso_8601_date(os:timestamp()),
-    JsonBody = list_to_binary(to_json(From, To, Body, Timestamp, XUrls)),
+    JsonBody = unicode:characters_to_list(to_json(From, To, Body, Timestamp, XUrls), utf8),
     Url = get_opt(url),
     ?INFO_MSG(Url, []),
     ?INFO_MSG(JsonBody, []),
