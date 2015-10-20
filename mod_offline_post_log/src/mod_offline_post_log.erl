@@ -78,7 +78,7 @@ get_body(Els) ->
         false ->
           no_body;
         {xmlcdata, Body} ->
-          {ok, unicode:characters_to_list(Body, utf8)}
+          {ok, unicode:characters_to_list(Body)}
       end
   end.
 
@@ -90,7 +90,7 @@ get_x_urls(Els) ->
 
 post_message(From, To, Body, XUrls) ->
     Timestamp = to_iso_8601_date(os:timestamp()),
-    JsonBody = unicode:characters_to_list(to_json(From, To, Body, Timestamp, XUrls), utf8),
+    JsonBody = unicode:characters_to_binary(to_json(From, To, Body, Timestamp, XUrls)),
     Url = get_opt(url),
     ?INFO_MSG(Url, []),
     ?INFO_MSG(JsonBody, []),
@@ -100,7 +100,7 @@ post_message(From, To, Body, XUrls) ->
     case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
             [{ssl,[{verify,0}]}], []) of
       {error, Reason} -> ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~s. Reason: ~s.", [error, Reason]);
-      {ok, Result} -> ?DEBUG("Message sent. Result: ~s.", [Result])
+      {_, _} -> ignore
     end,
     ok.
 
@@ -112,7 +112,7 @@ jid_to_json(_) ->
   "unknown".
 
 to_json(From, To, Body, Timestamp, XUrls) ->
-  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~s\",\"timestamp\":\"~s\",\"xurls\":~s}",
+  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~ts\",\"timestamp\":\"~s\",\"xurls\":~s}",
                 [jid_to_json(From), jid_to_json(To), Body, Timestamp, xurl_to_json(XUrls)]).
 
 
