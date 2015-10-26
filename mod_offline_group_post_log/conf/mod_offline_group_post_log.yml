@@ -1,0 +1,5 @@
+modules:
+  mod_offline_group_post_log:
+    url: "https://localhost:8080/message/offline"
+    username: "ejabberd"
+    password: "abcd"
