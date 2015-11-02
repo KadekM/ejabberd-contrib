@@ -99,7 +99,7 @@ post_message(From, To, Body, XUrls) ->
     BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
     case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
             [{ssl,[{verify,0}]}], []) of
-      {error, Reason} -> ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~s. Reason: ~s.", [error, Reason]);
+      {error, Reason} -> ?ERROR_MSG("Error while accessing messaging endpoint. Reason: ~p~n.", [Reason]);
       {_, _} -> ignore
     end,
     ok.
