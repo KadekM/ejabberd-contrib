@@ -18,21 +18,22 @@ modules:
 ## Content-body
 
 ```
-{  
-   "from":{  
-         "username":"Alice",
-         "server":"localhost",
-         "resource":"123456"
-          },
-   "to":{  
-         "username":"Bob",
-         "server":"localhost",
-         "resource":"789123456789"
-        },
-   "message":"someone somewhere somewhat",
-   "timestamp":"2015-08-25T23:25:12.123456Z",
-   "xurls": [ "url1" ]
- }
+{
+  "room": {
+    "jid": "testroom@conference.localhost",
+    "users": {
+      "subscribed": ["foo@localhost", "foo2@localhost"],
+      "online": ["foo@localhost"]
+    }
+  },
+  "from": {
+    "jid": "marek@localhost",
+    "nick": "marecek"
+    }
+   "message": "hello world",
+   "timestamp": "123",
+   "xurls": ["url1", "url2"]
+}
  ```
 
 ## Thanks
