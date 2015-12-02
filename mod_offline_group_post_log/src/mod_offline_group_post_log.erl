@@ -6,19 +6,24 @@
 -include("jlib.hrl").
 -include("logger.hrl").
 
--export([start/2, stop/1, foo/3]).
+-include("mod_muc_room.hrl").
+
+-export([start/2, stop/1, foo/3, muc_filter_message/5]).
 
 start(Host, _Opts) ->
-  ?INFO_MSG("starteeeeeeeeeed", []),
+  ?INFO_MSG("mod_offline_group_post_log started", []),
   case inets:start() of
     {error, {already_started, _}} -> ok;
     ok -> ok
   end,
-  ejabberd_hooks:add(filter_packet, Host, ?MODULE, foo, 1),
+  %% ejabberd_hooks:add(filter_packet, Host, ?MODULE, foo, 1),
+  ejabberd_hooks:add(muc_filter_message, Host, ?MODULE,
+    muc_filter_message, 1),
   ok.
 
 stop(Host) ->
-  ejabberd_hooks:delete(filter_packet, Host, ?MODULE, foo, 1),
+  %% ejabberd_hooks:delete(filter_packet, Host, ?MODULE, foo, 1),
+  ejabberd_hooks:delete(muc_filter_message, Host, ?MODULE, muc_filter_message, 1),
   ok.
 
 foo(a,b,c) ->
@@ -26,6 +31,37 @@ foo(a,b,c) ->
   ?INFO_MSG(b, []),
   ?INFO_MSG(c, []),
   ok.
+
+muc_filter_message(Pkt, MUCState, RoomJID, From, FromNick) ->
+  %%?INFO_MSG(Pkt, []),
+  %%Items = ejabberd_hooks:run_fold(roster_get_subscription_list, "localhost", {[], []}, []),
+  %%?INFO_MSG(State, []),
+
+ %% ?INFO_MSG(RoomJID, []),
+ %% ?INFO_MSG(From, []),
+ %% ?INFO_MSG(FromNick, []),
+
+  _LISTUSERS = lists:map(
+    fun({_LJID, Info}) ->
+      binary_to_list(Info#user.jid#jid.luser) ++ ".."
+    end,
+    dict:to_list(MUCState#state.users)
+  ),
+  ?INFO_MSG(" #########    GROUPCHAT _LISTUSERS = ~p~n  #######   ", [_LISTUSERS]),
+
+  _AFILLIATIONS = lists:map(
+    fun({{Uname, _Domain, _Res}, _Stuff}) ->
+      binary_to_list(Uname) ++ ".."
+    end,
+    dict:to_list(MUCState#state.affiliations)
+  ),
+  ?INFO_MSG(" #########    GROUPCHAT _AFILLIATIONS = ~p~n  #######   ", [_AFILLIATIONS]),
+
+  _OFFLINE = lists:subtract(_AFILLIATIONS, _LISTUSERS),
+  ?INFO_MSG(" #########    GROUPCHAT _OFFLINE = ~p~n  #######   ", [_OFFLINE]),
+
+  %%?INFO_MSG(Items, []),
+  Pkt.
 
 post_result({_ReqId, _Result}) ->
   ok.
