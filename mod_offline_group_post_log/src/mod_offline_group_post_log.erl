@@ -77,7 +77,7 @@ muc_filter_message(Stanza, MUCState, RoomJID, From, FromNick) ->
   BasicAuthPassword = get_opt(password),
   BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
   case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
-          [{ssl,[{verify,0}]}], []) of
+          [], []) of
   {Error, Reason} ->
       ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~p. Reason: ~p.",
         [Error, Reason])
