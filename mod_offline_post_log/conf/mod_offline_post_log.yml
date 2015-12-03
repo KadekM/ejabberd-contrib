@@ -1,5 +1,5 @@
 modules:
   mod_offline_post_log:
-    url: "https://localhost:8080/message/offline"
+    url: "https://localhost:8080/message/offline/single"
     username: "ejabberd"
     password: "abcd"
