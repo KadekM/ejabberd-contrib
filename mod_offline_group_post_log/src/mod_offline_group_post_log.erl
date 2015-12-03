@@ -10,8 +10,6 @@
 
 -export([start/2, stop/1, muc_filter_message/5]).
 
-% TODO: ssl is disabled ???
-
 start(Host, _Opts) ->
   ?INFO_MSG("mod_offline_group_post_log started", []),
   case inets:start() of
@@ -56,7 +54,7 @@ muc_filter_message(Stanza, MUCState, RoomJID, From, FromNick) ->
   JsonRoomUsersOnline = json_from_users(UsersOnline),
   JsonRoomUsersSubscribed = json_from_users_subscribed(UsersSubscribed),
   JsonRoomUsersField = io_lib:format("{\"subscribed\":~s,\"online\":~s}",
-    [JsonRoomUsersOnline, JsonRoomUsersSubscribed]),
+    [JsonRoomUsersSubscribed, JsonRoomUsersOnline]),
   JsonRoom = io_lib:format("{\"jid\":\"~s\",\"users\":~s}",[JsonRoomJid, JsonRoomUsersField]),
 
   % From json:
@@ -78,9 +76,9 @@ muc_filter_message(Stanza, MUCState, RoomJID, From, FromNick) ->
   BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
   case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
           [], []) of
-  {Error, Reason} ->
-      ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~p. Reason: ~p.",
-        [Error, Reason])
+  {error, Reason} ->
+      ?ERROR_MSG("Error while accessing messaging endpoint. Reason: ~p.", [Reason]);
+  {_, _} -> ignore
   end,
 
   Stanza.

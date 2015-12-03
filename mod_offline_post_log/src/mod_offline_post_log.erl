@@ -8,8 +8,6 @@
 
 -export([start/2, stop/1, log_user_send/3]).
 
-% TODO: ssl is disabled ???
-
 start(Host, _Opts) ->
   ?INFO_MSG("mod_offline_post_log started", []),
   case inets:start() of
@@ -88,11 +86,12 @@ post_message(From, To, Body, XUrls) ->
     BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
     case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
             [], []) of
-      {Error, Reason} ->
-        ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~p. Reason: ~p.",
-          [Error, Reason])
+      {error, Reason} ->
+        ?ERROR_MSG("Error while accessing messaging endpoint. Reason: ~p.", [Reason]);
+      {_, _} -> ignore
     end,
     ok.
+
 
 %% -----------------
 %% UTILITY FUNCTIONS
