@@ -10,6 +10,8 @@
 
 -export([start/2, stop/1, muc_filter_message/5]).
 
+% TODO: ssl is disabled ???
+
 start(Host, _Opts) ->
   ?INFO_MSG("mod_offline_group_post_log started", []),
   case inets:start() of
@@ -25,40 +27,100 @@ stop(Host) ->
   ok.
 
 muc_filter_message(Stanza, MUCState, RoomJID, From, FromNick) ->
-
-  _LISTUSERS = lists:map(
-    fun({_LJID, Info}) ->
-      binary_to_list(Info#user.jid#jid.luser) ++ ".."
-    end,
-    dict:to_list(MUCState#state.users)
-  ),
- % ?INFO_MSG(" #########    GROUPCHAT _LISTUSERS = ~p~n  #######   ", [_LISTUSERS]),
-
-  _AFILLIATIONS = lists:map(
-    fun({{Uname, _Domain, _Res}, _Stuff}) ->
-      binary_to_list(Uname) ++ ".."
-    end,
-    dict:to_list(MUCState#state.affiliations)
-  ),
-
- % ?INFO_MSG(" #########    GROUPCHAT _AFILLIATIONS = ~p~n  #######   ", [_AFILLIATIONS]),
-
- % _OFFLINE = lists:subtract(_AFILLIATIONS, _LISTUSERS),
- % ?INFO_MSG(" #########    GROUPCHAT _OFFLINE = ~p~n  #######   ", [_OFFLINE]),
-
   Body = xml:get_path_s(Stanza, [{elem, list_to_binary("body")}, cdata]),
   Timestamp = to_iso_8601_date(os:timestamp()),
-  Users = dict:to_list(MUCState#state.users),
-  Members = dict:to_list(MUCState#state.affiliations),
-  Offline = lists:subtract(Members, Users),
-  ?INFO_MSG(Body, []),
-  ?INFO_MSG(Offline, []),
+  UsersOnline = dict:to_list(MUCState#state.users),
+  UsersSubscribed = dict:to_list(MUCState#state.affiliations),
 
-  %%?INFO_MSG(Items, []),
+
+  %% Json has this structure:
+  %{
+  %"room": {
+  %  "jid": "testroom@conference.localhost",
+  %  "users": {
+  %    "subscribed": ["foo@localhost", "foo2@localhost"],
+  %    "online": ["foo@localhost"]
+  %  }
+  %},
+  %"from": {
+  %  "jid": "marek@localhost",
+  %  "nick": "marecek"
+  %  }
+  % "message": "hello world",
+  % "timestamp": "123",
+  % "xurls": []
+  %}
+
+  % Room json:
+  JsonRoomJid = jlib:jid_to_string(RoomJID),
+  JsonRoomUsersOnline = json_from_users(UsersOnline),
+  JsonRoomUsersSubscribed = json_from_users_subscribed(UsersSubscribed),
+  JsonRoomUsersField = io_lib:format("{\"subscribed\":~s,\"online\":~s}",
+    [JsonRoomUsersOnline, JsonRoomUsersSubscribed]),
+  JsonRoom = io_lib:format("{\"jid\":\"~s\",\"users\":~s}",[JsonRoomJid, JsonRoomUsersField]),
+
+  % From json:
+  JsonFrom = json_from_jidnick(From, FromNick),
+
+  % XUrls json:
+  JsonXUrls = get_x_urls(Stanza#xmlel.children),
+
+  % Final json:
+  JsonBody = unicode:characters_to_binary(io_lib:format("{\"room\":~s,\"from\":~s,\"message\":\"~ts\",\"timestamp\":\"~s\",\"xurls\":~s}",
+    [JsonRoom, JsonFrom, Body, Timestamp, list_to_json(JsonXUrls)])),
+
+  % Send request:
+  Url = get_opt(url),
+  ?INFO_MSG(" Contacing ~s with body ~s~n", [Url, JsonBody]),
+
+  BasicAuthUsername = get_opt(username),
+  BasicAuthPassword = get_opt(password),
+  BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
+  case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
+          [{ssl,[{verify,0}]}], []) of
+  {Error, Reason} ->
+      ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~p. Reason: ~p.",
+        [Error, Reason])
+  end,
+
   Stanza.
 
-post_result({_ReqId, _Result}) ->
-  ok.
+% Get online users, which is Map from Jid -> Informations
+json_from_users(Users) ->
+  Mapped = lists:map(
+    fun({_LJID, Info}) ->
+      unicode:characters_to_list(jlib:jid_to_string(Info#user.jid))
+    end, Users
+  ),
+  list_to_json(Mapped).
+
+% Get subscribed users (which is Map from Jid -> ???) = so basically read keys of map
+json_from_users_subscribed(Users) ->
+    Mapped = lists:map(
+      fun({Jid, _Stuff}) ->
+        unicode:characters_to_list(jlib:jid_to_string(Jid))
+      end, Users),
+  list_to_json(Mapped).
+
+json_from_jidnick(Jid, Nick) ->
+  FormattedJid = jlib:jid_to_string(Jid),
+  io_lib:format("{\"jid\":\"~s\",\"nick\":\"~s\"}", [FormattedJid, Nick]).
+
+%% -----------------
+%% UTILITY FUNCTIONS
+%% -----------------
+get_x_urls(Els) ->
+  OnlyXTags = [El || El <- Els, is_record(El, xmlel) andalso element(#xmlel.name, El) =:= <<"x">>,
+    lists:keyfind(<<"xmlns">>, 1, element(#xmlel.attrs, El)) =:= {<<"xmlns">>, <<"jabber:x:oob">>}],
+  FlattenChildren = [Children || El <- OnlyXTags, Children <- element(#xmlel.children, El), is_record(Children, xmlel), element(#xmlel.name, Children) =:= <<"url">> ],
+  [binary_to_list(element(2, UrlNode)) || U <- FlattenChildren, UrlNode <- element(#xmlel.children, U)].
+
+
+list_to_json(List) ->
+  io_lib:format("~p", [List]).
+
+basic_auth_header(Username, Password) ->
+  {"Authorization", "Basic " ++ base64:encode_to_string(Username ++ ":" ++ Password)}.
 
 get_opt(Opt) ->
       get_opt(Opt, undefined).

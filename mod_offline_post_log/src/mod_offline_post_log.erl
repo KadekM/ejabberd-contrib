@@ -8,15 +8,11 @@
 
 -export([start/2, stop/1, log_user_send/3]).
 
-%% TODO:
-%% - enable the https
-%% - cleanup
-%% - track requests
-%% - document, comment
+% TODO: ssl is disabled ???
 
 start(Host, _Opts) ->
-  %application:start(ssl), % todo: for https
-  case inets:start() of 
+  ?INFO_MSG("mod_offline_post_log started", []),
+  case inets:start() of
     {error, {already_started, _}} -> ok;
     ok -> ok
   end,
@@ -82,54 +78,44 @@ get_body(Els) ->
       end
   end.
 
+post_message(From, To, Body, XUrls) ->
+    Timestamp = to_iso_8601_date(os:timestamp()),
+    JsonBody = unicode:characters_to_binary(to_json(From, To, Body, Timestamp, XUrls)),
+    Url = get_opt(url),
+    ?DEBUG("Contacing ~s with body ~s", [Url, JsonBody]),
+    BasicAuthUsername = get_opt(username),
+    BasicAuthPassword = get_opt(password),
+    BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
+    case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
+            [{ssl,[{verify,0}]}], []) of
+      {Error, Reason} ->
+        ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~p. Reason: ~p.",
+          [Error, Reason])
+    end,
+    ok.
+
+%% -----------------
+%% UTILITY FUNCTIONS
+%% -----------------
+
 get_x_urls(Els) ->
   OnlyXTags = [El || El <- Els, is_record(El, xmlel) andalso element(#xmlel.name, El) =:= <<"x">>,
                      lists:keyfind(<<"xmlns">>, 1, element(#xmlel.attrs, El)) =:= {<<"xmlns">>, <<"jabber:x:oob">>}],
   FlattenChildren = [Children || El <- OnlyXTags, Children <- element(#xmlel.children, El), is_record(Children, xmlel), element(#xmlel.name, Children) =:= <<"url">> ],
   [binary_to_list(element(2, UrlNode)) || U <- FlattenChildren, UrlNode <- element(#xmlel.children, U)].
 
-post_message(From, To, Body, XUrls) ->
-    Timestamp = to_iso_8601_date(os:timestamp()),
-    JsonBody = unicode:characters_to_binary(to_json(From, To, Body, Timestamp, XUrls)),
-    Url = get_opt(url),
-    ?INFO_MSG(Url, []),
-    ?INFO_MSG(JsonBody, []),
-    BasicAuthUsername = get_opt(username),
-    BasicAuthPassword = get_opt(password),
-    BasicAuth = basic_auth_header(BasicAuthUsername, BasicAuthPassword),
-    case httpc:request(post, {Url, [BasicAuth, {"te", "deflate"}], "application/json", JsonBody},
-            [{ssl,[{verify,0}]}], []) of
-      {error, Reason} -> ?ERROR_MSG("Error while accessing messaging endpoint. Error: ~s. Reason: ~s.", [error, Reason]);
-      {_, _} -> ignore
-    end,
-    ok.
-
-% I didnt want to introduce dependency on json serializer just for this case
-jid_to_json(#jid{luser = Username, lserver = Server, lresource = Resource}) ->
-  io_lib:format("{\"username\":\"~s\",\"server\":\"~s\",\"resource\":\"~s\"}",
-                [Username, Server, Resource]);
-jid_to_json(_) ->
-  "unknown".
-
 to_json(From, To, Body, Timestamp, XUrls) ->
-  io_lib:format("{\"from\":~s,\"to\":~s,\"message\":\"~ts\",\"timestamp\":\"~s\",\"xurls\":~s}",
-                [jid_to_json(From), jid_to_json(To), Body, Timestamp, xurl_to_json(XUrls)]).
+  io_lib:format("{\"from\":\"~s\",\"to\":\"~s\",\"message\":\"~ts\",\"timestamp\":\"~s\",\"xurls\":~s}",
+                [jlib:jid_to_string(From), jlib:jid_to_string(To), Body, Timestamp, list_to_json(XUrls)]).
 
 
 % this will create JSON such as ["url1", "url2"...]
-xurl_to_json(XUrls) ->
+list_to_json(XUrls) ->
   io_lib:format("~p", [XUrls]).
   
 
 basic_auth_header(Username, Password) ->
   {"Authorization", "Basic " ++ base64:encode_to_string(Username ++ ":" ++ Password)}.
-
-% once we track results...
-post_result({_ReqId, {error, _Reason}}) ->
-  ok;
-
-post_result({_ReqId, _Result}) ->
-  ok.
 
 get_opt(Opt) ->
       get_opt(Opt, undefined).

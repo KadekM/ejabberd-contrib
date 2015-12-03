@@ -19,16 +19,8 @@ modules:
 
 ```
 {  
-   "from":{  
-         "username":"Alice",
-         "server":"localhost",
-         "resource":"123456"
-          },
-   "to":{  
-         "username":"Bob",
-         "server":"localhost",
-         "resource":"789123456789"
-        },
+   "from":"Alice@localhost/123456",
+   "to":"Bob@localhost/7891234567",  
    "message":"someone somewhere somewhat",
    "timestamp":"2015-08-25T23:25:12.123456Z",
    "xurls": [ "url1" ]
